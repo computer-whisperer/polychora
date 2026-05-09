@@ -555,11 +555,23 @@ impl App {
         let hotbar_start_x = (screen_rect.width() - total_hotbar_width) / 2.0;
         let hotbar_start_y = screen_rect.height() - slot_size - 10.0;
 
-        // Position to the left of the hotbar, vertically centered
+        // Prefer the left edge of the hotbar on wide windows. On narrower
+        // windows, lift the controls above the hotbar so they remain usable
+        // and do not collide with the Aetna hotbar.
         let widget_width = 148.0;
         let widget_height = 52.0;
-        let widget_x = hotbar_start_x - widget_width - 8.0;
-        let widget_y = hotbar_start_y + (slot_size - widget_height) / 2.0;
+        let left_of_hotbar_x = hotbar_start_x - widget_width - 8.0;
+        let (widget_x, widget_y) = if left_of_hotbar_x >= 10.0 {
+            (
+                left_of_hotbar_x,
+                hotbar_start_y + (slot_size - widget_height) / 2.0,
+            )
+        } else {
+            (
+                ((screen_rect.width() - widget_width) * 0.5).max(10.0),
+                (hotbar_start_y - widget_height - 8.0).max(10.0),
+            )
+        };
 
         let is_rotated = self.placement_orientation != TesseractOrientation::IDENTITY;
 
