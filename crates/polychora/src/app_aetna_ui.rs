@@ -1,6 +1,7 @@
 use aetna_core::prelude::{
-    badge, button, card, card_content, card_header, card_title, column, mono, row, spacer, stack,
-    text, tokens, Align, Axis, Color, Cursor, El, Justify, Rect, Size,
+    badge, button, card, card_content, card_header, card_title, column, image as aetna_image, mono,
+    row, spacer, stack, text, tokens, Align, Axis, Color, Cursor, El, ImageFit, Justify, Rect,
+    Size,
 };
 
 use super::{block_data_from_slot, format_cbor_for_display, App, WailaTarget};
@@ -74,22 +75,66 @@ impl App {
 
     fn build_aetna_hotbar_slot(&self, index: usize) -> El {
         let stack = self.inventory.hotbar_slot(index);
-        let (name, count, color) = stack
+        let (name, count, color, icon) = stack
             .as_ref()
-            .and_then(|stack| {
-                let block = stack.to_block_data()?;
-                let entry = self
+            .map(|stack| {
+                let tex = self
                     .content_registry
-                    .block_entry(block.namespace, block.block_type);
-                let name = entry
-                    .map(|entry| entry.name.clone())
-                    .unwrap_or_else(|| "Unknown".to_string());
-                let [r, g, b] = entry.map(|entry| entry.color).unwrap_or([128, 128, 128]);
-                Some((name, stack.count, Color::rgb(r, g, b)))
+                    .resolve_item_thumbnail_texture(&stack.item);
+                let icon = tex.and_then(|tex| {
+                    self.material_icon_sheet
+                        .as_ref()?
+                        .aetna_image(tex.namespace, tex.texture_id)
+                });
+
+                let (name, color) = if let Some(block) = stack.to_block_data() {
+                    let entry = self
+                        .content_registry
+                        .block_entry(block.namespace, block.block_type);
+                    let name = entry
+                        .map(|entry| entry.name.clone())
+                        .unwrap_or_else(|| "Unknown".to_string());
+                    let [r, g, b] = entry.map(|entry| entry.color).unwrap_or([128, 128, 128]);
+                    (name, Color::rgb(r, g, b))
+                } else if let Some((entity_ns, entity_type)) = stack.spawn_egg_entity_key() {
+                    let entry = self.content_registry.entity_lookup(entity_ns, entity_type);
+                    let name = entry
+                        .map(|entry| entry.canonical_name.clone())
+                        .unwrap_or_else(|| "Unknown".to_string());
+                    let [r, g, b] = entry
+                        .map(|entry| entry.base_color)
+                        .unwrap_or([128, 128, 128]);
+                    (name, Color::rgb(r, g, b))
+                } else {
+                    let [r, g, b] = self
+                        .content_registry
+                        .item_color(stack.item.namespace, stack.item.item_type);
+                    (
+                        self.content_registry
+                            .item_name(stack.item.namespace, stack.item.item_type)
+                            .to_string(),
+                        Color::rgb(r, g, b),
+                    )
+                };
+
+                (name, stack.count, color, icon)
             })
-            .unwrap_or_else(|| ("Empty".to_string(), 0, Color::rgb(44, 48, 58)));
+            .unwrap_or_else(|| ("Empty".to_string(), 0, Color::rgb(44, 48, 58), None));
         let selected = index == self.hotbar_selected_index;
         let label = short_label(name);
+        let icon = if let Some(icon) = icon {
+            aetna_image(icon)
+                .image_fit(ImageFit::Contain)
+                .width(Size::Fixed(44.0))
+                .height(Size::Fixed(34.0))
+                .radius(4.0)
+        } else {
+            column(std::iter::empty::<El>())
+                .width(Size::Fixed(44.0))
+                .height(Size::Fixed(34.0))
+                .fill(color)
+                .radius(4.0)
+        };
 
         column([
             row([
@@ -103,11 +148,7 @@ impl App {
             ])
             .width(Size::Fill(1.0))
             .align(Align::Center),
-            column(std::iter::empty::<El>())
-                .width(Size::Fixed(36.0))
-                .height(Size::Fixed(28.0))
-                .fill(color)
-                .radius(4.0),
+            icon,
             text(label)
                 .caption()
                 .center_text()

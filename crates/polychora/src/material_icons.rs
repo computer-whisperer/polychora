@@ -167,6 +167,9 @@ pub struct MaterialIconSheet {
     /// Map from (texture_namespace, texture_id) to UV rectangle
     /// [u_min, v_min, u_max, v_max].
     uv_rects: HashMap<(u32, u32), [f32; 4]>,
+    /// Per-texture images for Aetna. Aetna owns GPU upload/cache for these,
+    /// so callers do not need to route through the legacy egui sprite sheet.
+    aetna_images: HashMap<(u32, u32), aetna_core::image::Image>,
 }
 
 impl MaterialIconSheet {
@@ -174,6 +177,12 @@ impl MaterialIconSheet {
     /// if not found.
     pub fn uv_rect(&self, namespace: u32, texture_id: u32) -> Option<[f32; 4]> {
         self.uv_rects.get(&(namespace, texture_id)).copied()
+    }
+
+    /// Get an Aetna image for a texture by (namespace, texture_id), or None
+    /// if not found.
+    pub fn aetna_image(&self, namespace: u32, texture_id: u32) -> Option<aetna_core::image::Image> {
+        self.aetna_images.get(&(namespace, texture_id)).cloned()
     }
 }
 
@@ -201,6 +210,7 @@ pub fn generate_material_icon_sheet_gpu(
 
     let mut pixels = vec![0u8; (sheet_w * sheet_h * 4) as usize];
     let mut uv_rects = HashMap::new();
+    let mut aetna_images = HashMap::new();
     let icon_pixel_len = (ICON_SIZE * ICON_SIZE * 4) as usize;
 
     let mut offscreen = RenderContext::new(
@@ -271,9 +281,13 @@ pub fn generate_material_icon_sheet_gpu(
         copy_icon_to_sheet(&mut pixels, &raw, col, row, sheet_w);
 
         let uv = compute_uv(col, row, sheet_w, sheet_h);
+        let aetna_image = aetna_core::image::Image::from_rgba8(ICON_SIZE, ICON_SIZE, raw);
         uv_rects
             .entry((entry.texture.namespace, entry.texture.texture_id))
             .or_insert(uv);
+        aetna_images
+            .entry((entry.texture.namespace, entry.texture.texture_id))
+            .or_insert_with(|| aetna_image.clone());
 
         // Phase 3 inline: namespace-0 aliases for migrated blocks.
         // Blocks whose texture uses a plugin namespace (e.g. 0x706f6c79)
@@ -281,6 +295,9 @@ pub fn generate_material_icon_sheet_gpu(
         // (which use tex() → namespace 0) can resolve to an icon.
         if entry.texture.namespace != 0 {
             uv_rects.entry((0, entry.texture.texture_id)).or_insert(uv);
+            aetna_images
+                .entry((0, entry.texture.texture_id))
+                .or_insert_with(|| aetna_image.clone());
         }
     }
 
@@ -300,9 +317,13 @@ pub fn generate_material_icon_sheet_gpu(
         copy_icon_to_sheet(&mut pixels, &raw, col, row, sheet_w);
 
         let uv = compute_uv(col, row, sheet_w, sheet_h);
+        let aetna_image = aetna_core::image::Image::from_rgba8(ICON_SIZE, ICON_SIZE, raw);
         uv_rects
             .entry((0, entity.spawn_egg_texture_id))
             .or_insert(uv);
+        aetna_images
+            .entry((0, entity.spawn_egg_texture_id))
+            .or_insert(aetna_image);
 
         egg_idx += 1;
     }
@@ -312,6 +333,7 @@ pub fn generate_material_icon_sheet_gpu(
         width: sheet_w,
         height: sheet_h,
         uv_rects,
+        aetna_images,
     })
 }
 
