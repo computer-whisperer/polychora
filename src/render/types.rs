@@ -172,6 +172,7 @@ pub struct RenderOptions {
     pub hud_target_hit_face: Option<[i32; 4]>,
     pub hud_player_tags: Vec<HudPlayerTag>,
     pub egui_paint: Option<EguiPaintData>,
+    pub aetna_ui: Option<aetna_core::El>,
 }
 
 impl Default for RenderOptions {
@@ -213,6 +214,7 @@ impl Default for RenderOptions {
             hud_target_hit_face: None,
             hud_player_tags: Vec::new(),
             egui_paint: None,
+            aetna_ui: None,
         }
     }
 }

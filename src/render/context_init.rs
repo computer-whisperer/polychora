@@ -240,6 +240,13 @@ impl RenderContext {
         let framebuffers = render_pass.clone().and_then(|render_pass| {
             images.map(|images| window_size_dependent_setup(&images, &render_pass))
         });
+        let aetna_overlay = swapchain.as_ref().map(|swapchain| {
+            let mut runner =
+                aetna_vulkano::Runner::new(device.clone(), queue.clone(), swapchain.image_format());
+            runner.set_theme(aetna_core::Theme::radix_slate_blue_dark());
+            runner.set_surface_size(window_size.width.max(1), window_size.height.max(1));
+            AetnaOverlay { runner }
+        });
 
         let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
             device.clone(),
@@ -655,6 +662,7 @@ impl RenderContext {
             egui_resources,
             material_icons_view: None,
             material_icons_sampler: None,
+            aetna_overlay,
             hud_breadcrumbs: VecDeque::new(),
             hud_previous_camera: None,
             hud_previous_sample_time: None,

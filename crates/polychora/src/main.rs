@@ -1,3 +1,4 @@
+mod app_aetna_ui;
 mod app_bootstrap;
 mod app_console;
 mod app_controls;

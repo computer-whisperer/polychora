@@ -282,6 +282,10 @@ struct FrameInFlight {
     vte_entity_diag_non_voxel_tet_count: usize,
 }
 
+struct AetnaOverlay {
+    runner: aetna_vulkano::Runner,
+}
+
 struct EguiResources {
     atlas_view: Arc<ImageView>,
     atlas_sampler: Arc<Sampler>,
@@ -1428,6 +1432,7 @@ pub struct RenderContext {
     egui_resources: Option<EguiResources>,
     material_icons_view: Option<Arc<ImageView>>,
     material_icons_sampler: Option<Arc<Sampler>>,
+    aetna_overlay: Option<AetnaOverlay>,
     hud_breadcrumbs: VecDeque<[f32; 4]>,
     hud_previous_camera: Option<[f32; 4]>,
     hud_previous_sample_time: Option<Instant>,
@@ -2149,8 +2154,9 @@ gpu(px={},py={},l={},hit={},mat={},chunk={:?},t={:.6},reason={},steps={},rem={},
             time_ticks_ms,
             focal_length_xy,
             focal_length_zw,
-            render_options,
+            mut render_options,
         } = frame_params;
+        let mut aetna_ui = render_options.aetna_ui.take();
         let view_matrix_view = view_matrix.into_owned();
 
         // Guard against non-finite transforms/material data poisoning shared
@@ -2264,6 +2270,12 @@ gpu(px={},py={},l={},hit={},mat={},chunk={:?},t={:.6},reason={},steps={},rem={},
                             Some(window_size_dependent_setup(&new_images, &render_pass));
 
                         self.viewport.extent = window_size.into();
+                        if let Some(aetna) = self.aetna_overlay.as_mut() {
+                            aetna.runner.set_surface_size(
+                                window_size.width.max(1),
+                                window_size.height.max(1),
+                            );
+                        }
 
                         self.recreate_swapchain = false;
 
@@ -4506,6 +4518,40 @@ this reduced-storage configuration currently supports only '--backend voxel-trav
             hud_batches.append(&mut egui_batches);
         }
 
+        let aetna_draw_ready =
+            if let (Some(tree), Some(aetna)) = (aetna_ui.as_mut(), self.aetna_overlay.as_mut()) {
+                let (present_size, scale_factor) = match self.window.as_ref() {
+                    Some(window) => {
+                        let size = window.inner_size();
+                        (
+                            [size.width.max(1), size.height.max(1)],
+                            window.scale_factor() as f32,
+                        )
+                    }
+                    None => (
+                        [
+                            self.sized_buffers.render_dimensions[0].max(1),
+                            self.sized_buffers.render_dimensions[1].max(1),
+                        ],
+                        1.0,
+                    ),
+                };
+                aetna.runner.set_surface_size(present_size[0], present_size[1]);
+                aetna
+                    .runner
+                    .set_theme(aetna_core::Theme::radix_slate_blue_dark());
+                let viewport = aetna_core::Rect::new(
+                    0.0,
+                    0.0,
+                    present_size[0] as f32 / scale_factor,
+                    present_size[1] as f32 / scale_factor,
+                );
+                let _ = aetna.runner.prepare(tree, viewport, scale_factor);
+                true
+            } else {
+                false
+            };
+
         if let Some(image_index) = image_index {
             if let Some(framebuffers) = self.framebuffers.clone() {
                 if let Some(present_pipeline) = self.present_pipeline.as_ref() {
@@ -4650,6 +4696,11 @@ this reduced-storage configuration currently supports only '--backend voxel-trav
                                 )
                                 .unwrap();
                             unsafe { builder.draw(batch.vertex_count, 1, 0, 0) }.unwrap();
+                        }
+                    }
+                    if aetna_draw_ready {
+                        if let Some(aetna) = self.aetna_overlay.as_ref() {
+                            aetna.runner.draw(&mut builder);
                         }
                     }
                     {

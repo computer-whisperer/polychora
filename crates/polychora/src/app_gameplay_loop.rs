@@ -1668,6 +1668,11 @@ impl App {
         } else {
             self.run_egui_frame()
         };
+        let aetna_ui = if self.args.no_hud {
+            None
+        } else {
+            self.build_aetna_overlay()
+        };
         let mut do_navigation_hud =
             !self.menu_open && !self.dev_console_open && self.info_panel_mode != InfoPanelMode::Off;
         if self.args.no_hud {
@@ -1753,6 +1758,7 @@ impl App {
                 scene_data.hud_player_tags
             },
             egui_paint,
+            aetna_ui,
             ..Default::default()
         };
 

@@ -27,6 +27,7 @@ postcard = { version = "1", features = ["use-std"] }
 fixed = { version = "1", features = ["serde"] }
 egui = "0.34"
 egui-winit = { version = "0.34", default-features = false, features = ["links", "wayland", "x11"] }
+aetna-core = { path = "../../../../aetna/aetna.polychora-buffer-reuse/crates/aetna-core" }
 rodio = "0.22"
 ciborium = "0.2"
 crc32fast = "1.4"

@@ -36,6 +36,8 @@ nalgebra = {version="0.34"}
 
 bytemuck = { version = "1.18", features=["derive"] }
 image = { version="0.25", features=["rayon"] }
+aetna-core = { path = "../../aetna/aetna.polychora-buffer-reuse/crates/aetna-core" }
+aetna-vulkano = { path = "../../aetna/aetna.polychora-buffer-reuse/crates/aetna-vulkano" }
 
 # The Vulkan library doesn't provide any functionality to create and handle windows, as
 # this would be out of scope. In order to open a window, we are going to use the `winit` crate.

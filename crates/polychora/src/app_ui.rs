@@ -419,6 +419,7 @@ impl App {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn draw_egui_hotbar(&self, ctx: &egui::Context) {
         let screen_rect = ctx.content_rect();
         let slot_size = 80.0;
@@ -1562,11 +1563,7 @@ impl App {
                     self.draw_egui_inventory(&ctx, &mut close_inventory, &mut inventory_pick);
                 }
                 if self.teleport_dialog_open {
-                    self.draw_egui_teleport_dialog(
-                        &ctx,
-                        &mut teleport_target,
-                        &mut close_teleport,
-                    );
+                    self.draw_egui_teleport_dialog(&ctx, &mut teleport_target, &mut close_teleport);
                 }
                 if self.controls_dialog_open {
                     self.draw_egui_controls_dialog(&ctx);
@@ -1577,9 +1574,7 @@ impl App {
                 if self.block_gui_session.is_some() {
                     self.draw_egui_block_gui(&ctx, &mut close_block_gui);
                 }
-                self.draw_egui_hotbar(&ctx);
                 self.draw_egui_orientation_indicator(&ctx);
-                self.draw_egui_waila(&ctx);
             }
         });
 
@@ -1727,6 +1722,7 @@ impl App {
         })
     }
 
+    #[allow(dead_code)]
     fn draw_egui_waila(&self, ctx: &egui::Context) {
         let target = match &self.waila_target {
             Some(t) => t,
@@ -1777,6 +1773,7 @@ impl App {
             });
     }
 
+    #[allow(dead_code)]
     fn draw_waila_block(
         &self,
         ui: &mut egui::Ui,
@@ -1849,6 +1846,7 @@ impl App {
         );
     }
 
+    #[allow(dead_code)]
     fn draw_waila_entity(
         &self,
         ui: &mut egui::Ui,
