@@ -545,6 +545,7 @@ impl App {
             });
     }
 
+    #[allow(dead_code)]
     pub(super) fn draw_egui_orientation_indicator(&mut self, ctx: &egui::Context) {
         use polychora::shared::voxel::TesseractOrientation;
 
@@ -1586,7 +1587,6 @@ impl App {
                 if self.block_gui_session.is_some() {
                     self.draw_egui_block_gui(&ctx, &mut close_block_gui);
                 }
-                self.draw_egui_orientation_indicator(&ctx);
             }
         });
 
