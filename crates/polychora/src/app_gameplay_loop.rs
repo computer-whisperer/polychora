@@ -1663,10 +1663,18 @@ impl App {
         let (take_screenshot, auto_screenshot) =
             self.resolve_screenshot_request(command_screenshot_requested);
         let vte_sweep_status = self.vte_sweep_status_string();
-        let egui_paint = if self.args.no_hud && !self.dev_console_open {
-            None
-        } else {
+        let needs_egui_paint = self.app_state == AppState::MainMenu
+            || !self.world_ready
+            || self.menu_open
+            || self.inventory_open
+            || self.teleport_dialog_open
+            || self.controls_dialog_open
+            || self.dev_console_open
+            || self.block_gui_session.is_some();
+        let egui_paint = if needs_egui_paint {
             self.run_egui_frame()
+        } else {
+            None
         };
         let aetna_ui = if self.args.no_hud {
             None

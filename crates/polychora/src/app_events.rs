@@ -113,6 +113,7 @@ impl ApplicationHandler for App {
             || self.inventory_open
             || self.teleport_dialog_open
             || self.dev_console_open
+            || self.controls_dialog_open
             || self.block_gui_session.is_some();
         let egui_consumed = if let (Some(egui_state), Some(window)) =
             (self.egui_winit_state.as_mut(), window.as_ref())
