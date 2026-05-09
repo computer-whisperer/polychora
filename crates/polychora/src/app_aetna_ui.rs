@@ -1,9 +1,11 @@
 use aetna_core::prelude::{
     badge, card, card_content, card_header, card_title, column, mono, row, spacer, stack, text,
-    tokens, Align, Axis, Color, El, Justify, Rect, Size,
+    tokens, Align, Axis, Color, Cursor, El, Justify, Rect, Size,
 };
 
-use super::{format_cbor_for_display, App, WailaTarget};
+use super::{block_data_from_slot, format_cbor_for_display, App, WailaTarget};
+
+const HOTBAR_SLOT_KEY_PREFIX: &str = "aetna_hotbar_slot_";
 
 impl App {
     pub(super) fn build_aetna_overlay(&self) -> Option<El> {
@@ -12,32 +14,26 @@ impl App {
             children.push(waila);
         }
 
-        Some(
-            stack(children)
-                .key("aetna_overlay_root")
-                .fill_size()
-                .layout(|cx| {
-                    let mut rects = Vec::with_capacity(cx.children.len());
-                    for (index, child) in cx.children.iter().enumerate() {
-                        let (measured_w, measured_h) = (cx.measure)(child);
-                        let width = measured_w.min((cx.container.w - 24.0).max(260.0));
-                        let x = cx.container.x + ((cx.container.w - width) * 0.5).max(12.0);
-                        let y = if index == 0 {
-                            cx.container.bottom() - measured_h - 12.0
-                        } else {
-                            cx.container.y + 30.0
-                        };
-                        rects.push(Rect::new(x, y, width, measured_h));
-                    }
-                    rects
-                }),
-        )
+        Some(stack(children).fill_size().layout(|cx| {
+            let mut rects = Vec::with_capacity(cx.children.len());
+            for (index, child) in cx.children.iter().enumerate() {
+                let (measured_w, measured_h) = (cx.measure)(child);
+                let width = measured_w.min((cx.container.w - 24.0).max(260.0));
+                let x = cx.container.x + ((cx.container.w - width) * 0.5).max(12.0);
+                let y = if index == 0 {
+                    cx.container.bottom() - measured_h - 12.0
+                } else {
+                    cx.container.y + 30.0
+                };
+                rects.push(Rect::new(x, y, width, measured_h));
+            }
+            rects
+        }))
     }
 
     fn build_aetna_hotbar(&self) -> El {
         let slots = (0..9).map(|i| self.build_aetna_hotbar_slot(i));
         row(slots)
-            .key("aetna_hotbar")
             .gap(tokens::SPACE_2)
             .align(Align::Center)
             .height(Size::Hug)
@@ -88,6 +84,8 @@ impl App {
                 .width(Size::Fill(1.0)),
         ])
         .key(format!("aetna_hotbar_slot_{index}"))
+        .focusable()
+        .cursor(Cursor::Pointer)
         .width(Size::Fixed(76.0))
         .height(Size::Fixed(82.0))
         .padding(tokens::SPACE_2)
@@ -228,10 +226,37 @@ fn waila_panel(
         .gap(tokens::SPACE_3)]),
         card_content([column(details).gap(tokens::SPACE_1).width(Size::Fill(1.0))]).pt(0.0),
     ])
-    .key("aetna_waila_panel")
     .width(Size::Fixed(500.0))
     .height(Size::Hug)
     .axis(Axis::Column)
     .justify(Justify::Start)
     .shadow(tokens::SHADOW_LG)
+}
+
+impl App {
+    pub(super) fn handle_aetna_ui_events(&mut self, events: Vec<aetna_core::UiEvent>) -> bool {
+        let mut consumed = false;
+        for event in events {
+            let Some(route) = event.route() else {
+                continue;
+            };
+            let Some(slot_index) = aetna_hotbar_slot_index(route) else {
+                continue;
+            };
+
+            consumed = true;
+            if event.is_click_or_activate(route) {
+                self.hotbar_selected_index = slot_index;
+                self.selected_block =
+                    block_data_from_slot(self.inventory.hotbar_slot(self.hotbar_selected_index));
+            }
+        }
+        consumed
+    }
+}
+
+fn aetna_hotbar_slot_index(route: &str) -> Option<usize> {
+    let suffix = route.strip_prefix(HOTBAR_SLOT_KEY_PREFIX)?;
+    let index = suffix.parse::<usize>().ok()?;
+    (index < 9).then_some(index)
 }

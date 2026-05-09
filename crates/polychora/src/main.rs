@@ -850,6 +850,7 @@ fn main() {
         start_time: Instant::now(),
         last_frame: Instant::now(),
         mouse_grabbed: false,
+        aetna_last_pointer: None,
         should_exit_after_render: false,
         gpu_screenshot_countdown: if gpu_screenshot && args.commands.is_none() {
             match args.gpu_screenshot_source {
@@ -1216,6 +1217,7 @@ struct App {
     start_time: Instant,
     last_frame: Instant,
     mouse_grabbed: bool,
+    aetna_last_pointer: Option<(f32, f32)>,
     should_exit_after_render: bool,
     gpu_screenshot_countdown: u32,
     args: Args,

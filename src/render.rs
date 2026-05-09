@@ -1815,6 +1815,57 @@ gpu(px={},py={},l={},hit={},mat={},chunk={:?},t={:.6},reason={},steps={},rem={},
         self.recreate_swapchain = true;
     }
 
+    pub fn aetna_pointer_moved(&mut self, x: f32, y: f32) -> (bool, Vec<aetna_core::UiEvent>) {
+        let Some(aetna) = self.aetna_overlay.as_mut() else {
+            return (false, Vec::new());
+        };
+        let moved = aetna.runner.pointer_moved(x, y);
+        (moved.needs_redraw, moved.events)
+    }
+
+    pub fn aetna_pointer_left(&mut self) {
+        if let Some(aetna) = self.aetna_overlay.as_mut() {
+            aetna.runner.pointer_left();
+        }
+    }
+
+    pub fn aetna_pointer_down(
+        &mut self,
+        x: f32,
+        y: f32,
+        button: aetna_core::PointerButton,
+    ) -> Vec<aetna_core::UiEvent> {
+        self.aetna_overlay
+            .as_mut()
+            .map(|aetna| aetna.runner.pointer_down(x, y, button))
+            .unwrap_or_default()
+    }
+
+    pub fn aetna_pointer_up(
+        &mut self,
+        x: f32,
+        y: f32,
+        button: aetna_core::PointerButton,
+    ) -> Vec<aetna_core::UiEvent> {
+        self.aetna_overlay
+            .as_mut()
+            .map(|aetna| aetna.runner.pointer_up(x, y, button))
+            .unwrap_or_default()
+    }
+
+    pub fn aetna_pointer_wheel(&mut self, x: f32, y: f32, dy: f32) -> bool {
+        self.aetna_overlay
+            .as_mut()
+            .map(|aetna| aetna.runner.pointer_wheel(x, y, dy))
+            .unwrap_or(false)
+    }
+
+    pub fn aetna_set_modifiers(&mut self, modifiers: aetna_core::KeyModifiers) {
+        if let Some(aetna) = self.aetna_overlay.as_mut() {
+            aetna.runner.set_modifiers(modifiers);
+        }
+    }
+
     /// Recreate all resolution-dependent GPU buffers at a new render size.
     /// Waits for in-flight GPU work to complete, then rebuilds sized buffers
     /// and all per-frame descriptor sets that reference them.
@@ -4536,7 +4587,9 @@ this reduced-storage configuration currently supports only '--backend voxel-trav
                         1.0,
                     ),
                 };
-                aetna.runner.set_surface_size(present_size[0], present_size[1]);
+                aetna
+                    .runner
+                    .set_surface_size(present_size[0], present_size[1]);
                 aetna
                     .runner
                     .set_theme(aetna_core::Theme::radix_slate_blue_dark());

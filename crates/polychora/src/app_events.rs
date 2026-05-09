@@ -122,6 +122,11 @@ impl ApplicationHandler for App {
             false
         };
         let perf_suite_input_locked = self.perf_suite_active();
+        let route_aetna_overlay = self.app_state == AppState::Playing
+            && !self.args.no_hud
+            && !self.mouse_grabbed
+            && !show_egui_overlay
+            && !perf_suite_input_locked;
 
         match event {
             WindowEvent::CloseRequested => {
@@ -206,10 +211,71 @@ impl ApplicationHandler for App {
                     }
                 }
             }
+            WindowEvent::CursorMoved { position, .. } => {
+                if route_aetna_overlay {
+                    let scale = window
+                        .as_ref()
+                        .map(|window| window.scale_factor() as f32)
+                        .unwrap_or(1.0);
+                    let point = (position.x as f32 / scale, position.y as f32 / scale);
+                    self.aetna_last_pointer = Some(point);
+                    let (needs_redraw, events) = self
+                        .rcx
+                        .as_mut()
+                        .map(|rcx| rcx.aetna_pointer_moved(point.0, point.1))
+                        .unwrap_or_default();
+                    let consumed = self.handle_aetna_ui_events(events);
+                    if needs_redraw || consumed {
+                        if let Some(window) = window.as_ref() {
+                            window.request_redraw();
+                        }
+                    }
+                }
+            }
+            WindowEvent::CursorLeft { .. } => {
+                self.aetna_last_pointer = None;
+                if route_aetna_overlay {
+                    if let Some(rcx) = self.rcx.as_mut() {
+                        rcx.aetna_pointer_left();
+                    }
+                    if let Some(window) = window.as_ref() {
+                        window.request_redraw();
+                    }
+                }
+            }
+            WindowEvent::ModifiersChanged(modifiers) => {
+                if let Some(rcx) = self.rcx.as_mut() {
+                    rcx.aetna_set_modifiers(aetna_key_modifiers(modifiers.state()));
+                }
+            }
             WindowEvent::MouseInput { button, state, .. } => match button {
                 MouseButton::Left => {
                     if perf_suite_input_locked {
                         return;
+                    }
+                    if route_aetna_overlay && !egui_consumed {
+                        if let (Some(button), Some((x, y))) =
+                            (aetna_pointer_button(button), self.aetna_last_pointer)
+                        {
+                            let events = match state {
+                                winit::event::ElementState::Pressed => self
+                                    .rcx
+                                    .as_mut()
+                                    .map(|rcx| rcx.aetna_pointer_down(x, y, button))
+                                    .unwrap_or_default(),
+                                winit::event::ElementState::Released => self
+                                    .rcx
+                                    .as_mut()
+                                    .map(|rcx| rcx.aetna_pointer_up(x, y, button))
+                                    .unwrap_or_default(),
+                            };
+                            if self.handle_aetna_ui_events(events) {
+                                if let Some(window) = window.as_ref() {
+                                    window.request_redraw();
+                                }
+                                return;
+                            }
+                        }
                     }
                     if state.is_pressed() {
                         if self.app_state == AppState::MainMenu {
@@ -241,6 +307,30 @@ impl ApplicationHandler for App {
                     if perf_suite_input_locked {
                         return;
                     }
+                    if route_aetna_overlay && !egui_consumed {
+                        if let (Some(button), Some((x, y))) =
+                            (aetna_pointer_button(button), self.aetna_last_pointer)
+                        {
+                            let events = match state {
+                                winit::event::ElementState::Pressed => self
+                                    .rcx
+                                    .as_mut()
+                                    .map(|rcx| rcx.aetna_pointer_down(x, y, button))
+                                    .unwrap_or_default(),
+                                winit::event::ElementState::Released => self
+                                    .rcx
+                                    .as_mut()
+                                    .map(|rcx| rcx.aetna_pointer_up(x, y, button))
+                                    .unwrap_or_default(),
+                            };
+                            if self.handle_aetna_ui_events(events) {
+                                if let Some(window) = window.as_ref() {
+                                    window.request_redraw();
+                                }
+                                return;
+                            }
+                        }
+                    }
                     if !egui_consumed {
                         self.input.handle_mouse_button(button, state);
                     }
@@ -250,6 +340,31 @@ impl ApplicationHandler for App {
             WindowEvent::MouseWheel { delta, .. } => {
                 if perf_suite_input_locked {
                     return;
+                }
+                if route_aetna_overlay && !egui_consumed {
+                    if let Some((x, y)) = self.aetna_last_pointer {
+                        let scale = window
+                            .as_ref()
+                            .map(|window| window.scale_factor() as f32)
+                            .unwrap_or(1.0);
+                        let dy = match delta {
+                            winit::event::MouseScrollDelta::LineDelta(_, y) => -y * 50.0,
+                            winit::event::MouseScrollDelta::PixelDelta(pos) => {
+                                -(pos.y as f32) / scale
+                            }
+                        };
+                        if self
+                            .rcx
+                            .as_mut()
+                            .map(|rcx| rcx.aetna_pointer_wheel(x, y, dy))
+                            .unwrap_or(false)
+                        {
+                            if let Some(window) = window.as_ref() {
+                                window.request_redraw();
+                            }
+                            return;
+                        }
+                    }
                 }
                 if !egui_consumed {
                     let y = match delta {
@@ -307,6 +422,24 @@ impl ApplicationHandler for App {
                 window.request_redraw();
             }
         }
+    }
+}
+
+fn aetna_pointer_button(button: MouseButton) -> Option<aetna_core::PointerButton> {
+    match button {
+        MouseButton::Left => Some(aetna_core::PointerButton::Primary),
+        MouseButton::Right => Some(aetna_core::PointerButton::Secondary),
+        MouseButton::Middle => Some(aetna_core::PointerButton::Middle),
+        _ => None,
+    }
+}
+
+fn aetna_key_modifiers(mods: winit::keyboard::ModifiersState) -> aetna_core::KeyModifiers {
+    aetna_core::KeyModifiers {
+        shift: mods.shift_key(),
+        ctrl: mods.control_key(),
+        alt: mods.alt_key(),
+        logo: mods.super_key(),
     }
 }
 
